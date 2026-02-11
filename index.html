@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart SPBT - Pengurusan Stok</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* Modal Styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 50; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.5); 
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 8px;
+        }
+
+        /* Print Specific Styles */
+        @media print {
+            @page { size: landscape; margin: 5mm; } 
+            body { background: white; -webkit-print-color-adjust: exact; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            .only-print { display: block !important; }
+            
+            .print-container {
+                width: 100%;
+                font-family: 'Times New Roman', serif;
+                font-size: 9pt; 
+                color: black;
+                margin-bottom: 0;
+                page-break-after: always; 
+                display: block;
+                height: 100vh; 
+            }
+
+            .print-container:last-child {
+                page-break-after: auto;
+            }
+
+            .print-title {
+                text-align: center;
+                font-weight: bold;
+                font-size: 14pt;
+                margin-bottom: 10px;
+                text-decoration: underline;
+                text-transform: uppercase;
+            }
+
+            .header-info-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 5px;
+                margin-bottom: 10px;
+                font-weight: bold;
+                text-transform: uppercase;
+                font-size: 10pt;
+            }
+
+            table.print-table {
+                width: 100%;
+                border-collapse: collapse;
+                border: 1px solid black;
+                table-layout: fixed; 
+            }
+
+            table.print-table th, table.print-table td {
+                border: 1px solid black;
+                padding: 3px;
+                text-align: center;
+                vertical-align: middle;
+                word-wrap: break-word;
+            }
+
+            table.print-table th {
+                background-color: #f0f0f0; 
+            }
+
+            .col-date { width: 6%; }
+            .col-nofail { width: 6%; }
+            .col-nota { width: 8%; }
+            .col-bil { width: 5%; }
+            .col-daripada { width: 10%; }
+            .col-oleh { width: 8%; }
+            
+            .col-kepada { width: 10%; }
+            .col-rujkeluar { width: 8%; }
+            
+            .col-baki { width: 5%; }
+            .col-catatan { width: 8%; }
+
+            .signature-area {
+                margin-top: 30px;
+                display: flex;
+                justify-content: space-around;
+                text-align: center;
+            }
+            .signature-line {
+                border-top: 1px solid black;
+                width: 200px;
+                margin: 0 auto;
+                margin-top: 5px;
+            }
+        }
+
+        .only-print { display: none; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <nav class="bg-blue-800 text-white p-4 shadow-lg no-print">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold"><i class="fas fa-book mr-2"></i>Smart SPBT - Arkib Digital</h1>
+            <div>
+                <button onclick="clearData()" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1 rounded transition">Reset Sistem</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 mb-auto">
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6 no-print border-t-4 border-blue-600">
+            <div class="flex justify-between items-center border-b pb-2 mb-4">
+                <h2 class="text-lg font-semibold text-blue-800">Papan Pemuka & Pilihan Arkib</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                <div class="relative">
+                    <label class="block text-sm font-medium text-gray-700">Pilih Tahun (Folder Utama)</label>
+                    <div class="flex gap-2 mt-1">
+                        <select id="inputTahun" onchange="loadBookListForYear(); saveMetadata();" class="block w-full rounded-md border border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">- Sila Pilih Tahun -</option>
+                            <option value="1">Tahun 1</option> 
+                            <option value="2">Tahun 2</option>
+                            <option value="3">Tahun 3</option>
+                            <option value="4">Tahun 4</option>
+                            <option value="5">Tahun 5</option>
+                            <option value="6">Tahun 6</option>
+                            <option value="Peralihan">Peralihan</option>
+                            <option value="Tingkatan 1">Tingkatan 1</option>
+                            <option value="Tingkatan 2">Tingkatan 2</option>
+                            <option value="Tingkatan 3">Tingkatan 3</option>
+                            <option value="Tingkatan 4">Tingkatan 4</option>
+                            <option value="Tingkatan 5">Tingkatan 5</option>
+                        </select>
+                        <button onclick="openConfigModal()" title="Urus Senarai Buku" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-3 rounded border border-gray-300">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center">
+                        <label class="block text-sm font-medium text-gray-700">Pilih Judul Buku</label>
+                        <label class="inline-flex items-center cursor-pointer mb-1">
+                            <input type="checkbox" id="toggleBulk" class="sr-only peer" onchange="toggleBulkMode()">
+                            <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            <span class="ms-2 text-xs font-bold text-gray-700">Input Pukal (Tanda Kotak)</span>
+                        </label>
+                    </div>
+
+                    <select id="inputJudul" onchange="fillBookDetails(); saveMetadata(); renderTables();" class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-yellow-50">
+                        <option value="">-- Pilih Tahun Dahulu --</option>
+                    </select>
+
+                    <div id="bulkContainer" class="hidden mt-1 border border-gray-300 rounded bg-gray-50">
+                        <div class="p-2 h-40 overflow-y-auto" id="bulkCheckboxes">
+                            </div>
+                        <div class="p-2 bg-gray-100 border-t flex justify-center">
+                            <button type="button" onclick="saveBulkData()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm shadow-sm transition">
+                                <i class="fas fa-save mr-1"></i> SIMPAN REKOD PUKAL
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Penerbit</label>
+                        <input type="text" id="inputPenerbit" readonly class="mt-1 block w-full bg-gray-100 rounded-md border border-gray-300 p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Harga (RM)</label>
+                        <input type="text" id="inputHarga" readonly class="mt-1 block w-full bg-gray-100 rounded-md border border-gray-300 p-2 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Kod Buku</label>
+                    <input type="text" id="inputKod" oninput="saveMetadata()" class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" placeholder="Contoh: F0111">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Oleh (Nama & Jawatan)</label>
+                    <input type="text" id="input_oleh" onkeyup="saveMetadata(); updateCetakanOleh()" class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" placeholder="Cth: Ali (Guru SPBT)">
+                </div>
+
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6 no-print border-t-4 border-green-600">
+            <h2 class="text-lg font-semibold mb-4 text-green-800 border-b pb-2">Input Transaksi</h2>
+            <form id="transForm" onsubmit="addTransaction(event)">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div class="col-span-1 md:col-span-2 lg:col-span-4 bg-gray-100 p-3 rounded-md flex gap-4 justify-center">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="jenisTrans" value="terima" class="form-radio text-green-600 h-5 w-5" checked onchange="toggleFormMode()">
+                            <span class="ml-2 font-bold text-green-700">TERIMA STOK (Input)</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="jenisTrans" value="keluar" class="form-radio text-red-600 h-5 w-5" onchange="toggleFormMode()">
+                            <span class="ml-2 font-bold text-red-700">KELUAR STOK (Output)</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Tarikh</label>
+                        <input type="date" id="tTarikh" required class="w-full border p-2 rounded focus:ring-2 ring-blue-300">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Bilangan Naskah</label>
+                        <div id="qtyInputContainer">
+                            <input type="number" id="tBilangan" required min="0" max="100" class="w-full border p-2 rounded focus:ring-2 ring-blue-300 font-bold text-lg">
+                        </div>
+                        <div id="qtyFixedContainer" class="hidden">
+                            <input type="text" id="bulkQtyDisplay" value="0" readonly class="w-full border p-2 rounded bg-yellow-100 text-yellow-800 font-bold text-center border-yellow-300 shadow-inner cursor-not-allowed">
+                        </div>
+                    </div>
+
+                    <div id="fieldRujukan" class="lg:col-span-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label id="lblNoRujukan" class="block text-xs font-bold text-gray-500 uppercase">No. Fail</label>
+                                <input type="text" id="tNoRujukan" class="w-full border p-2 rounded" placeholder="Contoh: JPN/SPBT/2023/01">
+                            </div>
+                            <div id="divNotaSerahan">
+                                <label class="block text-xs font-bold text-gray-500 uppercase">No. Nota Serahan</label>
+                                <input type="text" id="tNotaSerahan" class="w-full border p-2 rounded" placeholder="Contoh: NS/001">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="fieldPunca" class="hidden lg:col-span-2">
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Daripada (Penerbit/BOSS)</label>
+                        <select id="tDaripadaMain" class="w-full border p-2 rounded bg-white mb-1" onchange="handleSrcChange()">
+                            <option value="">- Sila Pilih Punca -</option>
+                            <option value="PENERBIT">PENERBIT</option>
+                            <option value="BOSD">BOSD</option>
+                            <option value="SEKOLAH LAIN">SEKOLAH LAIN</option>
+                            <option value="SPBTG KELAS">SPBTG KELAS</option>
+                            <option value="KETUA PANITIA">KETUA PANITIA</option>
+                            <option value="Lain-Lain">Lain-Lain (Taip Sendiri)</option>
+                        </select>
+                        <select id="tDaripadaKelas" class="w-full border p-2 rounded bg-blue-50 border-blue-300 hidden mb-1">
+                            <option value="">- Pilih Kelas -</option>
+                            <option value="1 Brilliant">1 Brilliant</option>
+                            <option value="1 Excellent">1 Excellent</option>
+                            <option value="2 Brilliant">2 Brilliant</option>
+                            <option value="2 Excellent">2 Excellent</option>
+                            <option value="3 Brilliant">3 Brilliant</option>
+                            <option value="3 Excellent">3 Excellent</option>
+                            <option value="4 Brilliant">4 Brilliant</option>
+                            <option value="4 Excellent">4 Excellent</option>
+                            <option value="5 Brilliant">5 Brilliant</option>
+                            <option value="5 Excellent">5 Excellent</option>
+                            <option value="5 Intelligent">5 Intelligent</option>
+                            <option value="6 Brilliant">6 Brilliant</option>
+                            <option value="6 Excellent">6 Excellent</option>
+                        </select>
+                        <input type="text" id="tDaripadaLain" class="w-full border p-2 rounded bg-yellow-50 border-yellow-300 hidden" placeholder="Sila taip punca di sini...">
+                    </div>
+
+                    <div id="fieldPenerima" class="hidden lg:col-span-2">
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Kepada (Tahun/Tingkatan)</label>
+                        <select id="tKepadaMain" class="w-full border p-2 rounded bg-white mb-1" onchange="handleDestChange()">
+                            <option value="">- Sila Pilih Penerima -</option>
+                            <option value="SPBTG KELAS">SPBTG KELAS</option>
+                            <option value="PELUPUSAN">PELUPUSAN</option>
+                            <option value="BOSD">BOSD</option>
+                            <option value="SEKOLAH LAIN">SEKOLAH LAIN</option>
+                            <option value="KETUA PANITIA">KETUA PANITIA</option>
+                            <option value="Lain-Lain">Lain-Lain (Taip Sendiri)</option>
+                        </select>
+                        <select id="tKepadaKelas" class="w-full border p-2 rounded bg-blue-50 border-blue-300 hidden mb-1">
+                            <option value="">- Pilih Kelas -</option>
+                            <option value="1 Brilliant">1 Brilliant</option>
+                            <option value="1 Excellent">1 Excellent</option>
+                            <option value="2 Brilliant">2 Brilliant</option>
+                            <option value="2 Excellent">2 Excellent</option>
+                            <option value="3 Brilliant">3 Brilliant</option>
+                            <option value="3 Excellent">3 Excellent</option>
+                            <option value="4 Brilliant">4 Brilliant</option>
+                            <option value="4 Excellent">4 Excellent</option>
+                            <option value="5 Brilliant">5 Brilliant</option>
+                            <option value="5 Excellent">5 Excellent</option>
+                            <option value="5 Intelligent">5 Intelligent</option>
+                            <option value="6 Brilliant">6 Brilliant</option>
+                            <option value="6 Excellent">6 Excellent</option>
+                        </select>
+                         <input type="text" id="tKepadaLain" class="w-full border p-2 rounded bg-yellow-50 border-yellow-300 hidden" placeholder="Sila taip penerima di sini...">
+                    </div>
+
+                    <div class="lg:col-span-4">
+                        <div id="divCatatanDropdown">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Catatan</label>
+                            <select id="tCatatan" class="w-full border p-2 rounded bg-white">
+                                <option value="">- Tiada Catatan -</option>
+                                <option value="BUKU ROSAK">BUKU ROSAK</option>
+                                <option value="AGIHAN KE SEKOLAH LAIN">AGIHAN KE SEKOLAH LAIN</option>
+                                <option value="AGIHAN BOSD">AGIHAN BOSD</option>
+                                <option value="PERPINDAHAN MURID">PERPINDAHAN MURID</option>
+                                <option value="PELUPUSAN">PELUPUSAN</option>
+                                <option value="HAPUS KIRA">HAPUS KIRA</option>
+                                <option value="PELARASAN STOK">PELARASAN STOK</option>
+                            </select>
+                        </div>
+                        <div id="divNamaPenerima" class="hidden">
+                            <label class="block text-xs font-bold text-gray-500 uppercase text-red-600">Nama Penerima (Akan masuk ke Catatan)</label>
+                            <input type="text" id="tNamaPenerima" class="w-full border p-2 rounded border-red-300 focus:ring-red-500" placeholder="Contoh: ALI BIN ABU">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button id="btnTambahSingle" type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded shadow-lg transition transform active:scale-95">
+                        <i class="fas fa-plus-circle mr-2"></i> TAMBAH KE ARKIB
+                    </button>
+                    <button type="button" onclick="cetakLaporan()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded shadow-lg transition">
+                        <i class="fas fa-print mr-2"></i> CETAK FOLDER
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden no-print">
+            <div class="bg-yellow-50 p-2 text-sm text-center font-bold border-b border-yellow-200">
+                <i class="fas fa-folder-open mr-2"></i>Folder: <span id="folderLabel">Tiada Pilihan</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-800 text-white">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Tarikh</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Jenis</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Butiran</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider">Masuk</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider">Keluar</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider bg-yellow-600 text-white">Baki</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider">Tindakan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="screenTableBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="p-8 text-center text-gray-500 hidden">
+                <i class="fas fa-folder text-4xl mb-3 text-gray-300"></i>
+                <p>Arkib kosong untuk buku ini. Sila masukkan data.</p>
+            </div>
+        </div>
+
+        <div id="printAreaWrapper" class="only-print">
+            </div>
+
+    </div>
+
+    <footer class="text-center text-xs text-gray-500 py-4 mt-auto no-print border-t bg-gray-50">
+        Powered By Ts. AKBAR @2026 Hak Cipta Terpelihara.
+    </footer>
+
+    <div id="configModal" class="modal">
+        <div class="modal-content shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="text-xl font-bold text-gray-800">Urus Senarai Buku: <span id="modalTahunTitle" class="text-blue-600"></span></h2>
+                <button onclick="closeConfigModal()" class="text-gray-500 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            
+            <p class="text-sm text-gray-600 mb-4">Masukkan senarai buku untuk tahun ini. Data akan disimpan secara kekal.</p>
+            
+            <div class="overflow-y-auto max-h-96 border rounded mb-4">
+                <table class="w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2">Judul Buku</th>
+                            <th class="px-4 py-2 w-24">Harga (RM)</th>
+                            <th class="px-4 py-2 w-48">Penerbit</th>
+                            <th class="px-4 py-2 w-16 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="configTableBody">
+                        </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between">
+                <button onclick="addConfigRow()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
+                    <i class="fas fa-plus"></i> Tambah Baris
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="saveConfigData()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-bold">
+                        <i class="fas fa-save"></i> SIMPAN SENARAI
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultBookData = {
+            "1": [ { judul: "BAHASA MELAYU (SK) TAHUN 1", harga: "9.70", penerbit: "DBP" }, { judul: "MATEMATIK JILID 1 (SK) TAHUN 1", harga: "7.00", penerbit: "DBP" }, { judul: "MATEMATIK JILID 2 (SK) TAHUN 1", harga: "5.00", penerbit: "DBP" }, { judul: "SAINS (SK) TAHUN 1", harga: "6.50", penerbit: "DBP" }, { judul: "PENDIDIKAN ISLAM (SK) TAHUN 1", harga: "8.50", penerbit: "DBP" }, { judul: "PENDIDIKAN MORAL (SK) TAHUN 1", harga: "6.00", penerbit: "DBP" }, { judul: "BAHASA ARAB (SK) TAHUN 1", harga: "4.00", penerbit: "DBP" }, { judul: "SUPERMINDS (SK) TAHUN 1", harga: "38.80", penerbit: "PAN ASIA PUBLICATIONS" }, { judul: "PEND. JASMANI DAN PEND. KESIHATAN (SK) TAHUN 1", harga: "6.50", penerbit: "DBP" }, { judul: "PENDIDIKAN KESENIAN (SK) TAHUN 1", harga: "6.00", penerbit: "DBP" }, { judul: "IQRA’ JILID 1", harga: "9.50", penerbit: "DARUL FIKIR" }, { judul: "IQRA’ JILID 2", harga: "5.70", penerbit: "DARUL FIKIR" } ],
+            "2": [ { judul: "BAHASA MELAYU JILID 1 (SK) TAHUN 2", harga: "4.60", penerbit: "DBP" }, { judul: "BAHASA MELAYU JILID 2 (SK) TAHUN 2", harga: "4.60", penerbit: "DBP" }, { judul: "MATEMATIK JILID 1 (SK) TAHUN 2", harga: "6.70", penerbit: "DBP" }, { judul: "MATEMATIK JILID 2 (SK) TAHUN 2", harga: "5.90", penerbit: "DBP" }, { judul: "SAINS (SK) TAHUN 2", harga: "7.50", penerbit: "DBP" }, { judul: "PENDIDIKAN ISLAM (SK) TAHUN 2", harga: "7.80", penerbit: "DBP" }, { judul: "PENDIDIKAN MORAL (SK) TAHUN 2", harga: "9.00", penerbit: "DBP" }, { judul: "BAHASA ARAB (SK) TAHUN 2", harga: "6.70", penerbit: "DBP" }, { judul: "SUPERMINDS (SK) TAHUN 2", harga: "38.80", penerbit: "PAN ASIA PUBLICATIONS" }, { judul: "PEND. JASMANI DAN PEND. KESIHATAN (SK) TAHUN 2", harga: "6.20", penerbit: "DBP" }, { judul: "PENDIDIKAN KESENIAN (SK) TAHUN 2", harga: "6.00", penerbit: "DBP" } ],
+            "3": [ { judul: "BAHASA MELAYU JILID 1 (SK) TAHUN 3", harga: "5.80", penerbit: "DBP" }, { judul: "BAHASA MELAYU JILID 2 (SK) TAHUN 3", harga: "5.80", penerbit: "DBP" }, { judul: "MATEMATIK JILID 1 (SK) TAHUN 3", harga: "7.40", penerbit: "DBP" }, { judul: "MATEMATIK JILID 2 (SK) TAHUN 3", harga: "7.40", penerbit: "DBP" }, { judul: "SAINS (SK) TAHUN 3", harga: "9.00", penerbit: "DBP" }, { judul: "PENDIDIKAN ISLAM (SK) TAHUN 3", harga: "9.50", penerbit: "DBP" }, { judul: "PENDIDIKAN MORAL (SK) TAHUN 3", harga: "10.00", penerbit: "DBP" }, { judul: "BAHASA ARAB (SK) TAHUN 3", harga: "8.10", penerbit: "DBP" }, { judul: "GET SMART PLUS 3", harga: "35.00", penerbit: "SYKT ARENA ILMU" }, { judul: "PEND. JASMANI DAN PEND. KESIHATAN (SK) TAHUN 3", harga: "6.90", penerbit: "DBP" }, { judul: "PENDIDIKAN KESENIAN (SK) TAHUN 3", harga: "5.90", penerbit: "DBP" } ],
+            "4": [ { judul: "BAHASA MELAYU TAHUN 4 SK", harga: "13.50", penerbit: "DBP" }, { judul: "GET SMART PLUS 4", harga: "29.90", penerbit: "NND ENTERPRISE" }, { judul: "MATEMATIK TAHUN 4 SK", harga: "17.10", penerbit: "DBP" }, { judul: "PENDIDIKAN ISLAM TAHUN 4", harga: "13.10", penerbit: "DBP" }, { judul: "PENDIDIKAN MORAL TAHUN 4 SK", harga: "14.60", penerbit: "DBP" }, { judul: "BAHASA ARAB TAHUN 4", harga: "9.00", penerbit: "DBP" }, { judul: "PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN TAHUN 4 SK", harga: "7.00", penerbit: "DBP" }, { judul: "PENDIDIKAN KESENIAN TAHUN 4 SK", harga: "7.10", penerbit: "DBP" }, { judul: "REKA BENTUK DAN TEKNOLOGI TAHUN 4 SK", harga: "6.80", penerbit: "DBP" }, { judul: "SAINS TAHUN 4 SK", harga: "11.50", penerbit: "DBP" }, { judul: "SEJARAH TAHUN 4 SK", harga: "12.60", penerbit: "DBP" }, { judul: "THE JUNGLE BOOK", harga: "11.20", penerbit: "IMS BOOKS TRADING" }, { judul: "THE KING OF KITES", harga: "12.50", penerbit: "SYKT ARENA ILMU" }, { judul: "ANTHOLOGY OF POEM (SK) YEAR 4,5,6", harga: "9.80", penerbit: "UNIVERSITY BOOKSTORE" } ],
+            "5": [ { judul: "BAHASA MELAYU TAHUN 5 SK", harga: "14.00", penerbit: "DBP" }, { judul: "ENGLISH PLUS 1 STUDENT’S BOOK YEAR 5", harga: "38.00", penerbit: "MY BOOKSTORE" }, { judul: "MATEMATIK TAHUN 5 SK", harga: "17.10", penerbit: "DBP" }, { judul: "PENDIDIKAN ISLAM TAHUN 5", harga: "13.10", penerbit: "DBP" }, { judul: "PENDIDIKAN MORAL TAHUN 5 SK", harga: "15.00", penerbit: "DBP" }, { judul: "BAHASA ARAB TAHUN 5", harga: "9.00", penerbit: "DBP" }, { judul: "PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN TAHUN 5 SK", harga: "7.00", penerbit: "DBP" }, { judul: "PENDIDIKAN SENI VISUAL TAHUN 5 SK", harga: "7.50", penerbit: "DBP" }, { judul: "REKA BENTUK DAN TEKNOLOGI TAHUN 5 SK", harga: "7.00", penerbit: "DBP" }, { judul: "SAINS TAHUN 5 SK", harga: "13.00", penerbit: "DBP" }, { judul: "SEJARAH TAHUN 5 SK", harga: "13.00", penerbit: "DBP" }, { judul: "PENDIDIKAN MUZIK TAHUN 5 SK", harga: "7.50", penerbit: "DBP" }, { judul: "AND SOMETHING WEIRD HAPPENED", harga: "11.00", penerbit: "DANALIS DISTRIBUTORS" }, { judul: "GULLIVER’ TRAVELS", harga: "11.10", penerbit: "NND ENTERPRISE" }, { judul: "ANTHOLOGY OF POEM (SK) YEAR 4,5,6", harga: "9.80", penerbit: "DANALIS DISTRIBUTORS" } ],
+            "6": [ { judul: "BAHASA MELAYU TAHUN 6 SK", harga: "14.00", penerbit: "DBP" }, { judul: "ENGLISH CEFR (ACADEMY STAR) YEAR 6", harga: "34.30", penerbit: "ITBM" }, { judul: "MATEMATIK TAHUN 6 SK", harga: "14.80", penerbit: "DBP" }, { judul: "PENDIDIKAN ISLAM TAHUN 6", harga: "13.60", penerbit: "DBP" }, { judul: "PENDIDIKAN MORAL TAHUN 6 SK", harga: "15.80", penerbit: "DBP" }, { judul: "BAHASA ARAB TAHUN 6", harga: "9.60", penerbit: "DBP" }, { judul: "PENDIDIKAN JASMANI DAN PENDIDIKAN KESIHATAN TAHUN 6 SK", harga: "7.00", penerbit: "DBP" }, { judul: "PENDIDIKAN SENI VISUAL TAHUN 6 SK", harga: "7.70", penerbit: "DBP" }, { judul: "REKA BENTUK DAN TEKNOLOGI TAHUN 6 SK", harga: "6.70", penerbit: "DBP" }, { judul: "SAINS TAHUN 6 SK", harga: "13.00", penerbit: "DBP" }, { judul: "SEJARAH TAHUN 6 SK", harga: "13.10", penerbit: "DBP" }, { judul: "PENDIDIKAN MUZIK TAHUN 6 SK", harga: "7.70", penerbit: "DBP" }, { judul: "WIZARD OF OZ YEAR 6", harga: "12.40", penerbit: "TRADE SERVE RESOURCES" }, { judul: "AKBAR’S DERAMS YEAR 6", harga: "11.40", penerbit: "TRADE SERVE RESOURCES" }, { judul: "ANTHOLOGY OF POEM (SK) YEAR 4,5,6", harga: "9.80", penerbit: "UNIVERSITY BOOKSTORE" } ]
+        };
+
+        const DB_KEY = 'spbtConfig_v3'; 
+        let bookDatabase = {}; 
+        let transactions = [];
+        let metadata = { tahun: '', judul: '', penerbit: '', kod: '', harga: '', oleh: '' };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAllData();
+            document.getElementById('tTarikh').valueAsDate = new Date();
+            toggleFormMode();
+        });
+
+        // Toggle Bulk Mode Logic
+        function toggleBulkMode() {
+            const isBulk = document.getElementById('toggleBulk').checked;
+            const singleSelect = document.getElementById('inputJudul');
+            const bulkContainer = document.getElementById('bulkContainer');
+            const qtyInput = document.getElementById('qtyInputContainer');
+            const qtyFixed = document.getElementById('qtyFixedContainer');
+            const btnSingle = document.getElementById('btnTambahSingle');
+
+            if (isBulk) {
+                singleSelect.classList.add('hidden');
+                bulkContainer.classList.remove('hidden');
+                qtyInput.classList.add('hidden');
+                qtyFixed.classList.remove('hidden');
+                btnSingle.classList.add('hidden'); 
+                renderBulkCheckboxes();
+                updateBulkCount(); // Ensure count starts at 0 or current
+            } else {
+                singleSelect.classList.remove('hidden');
+                bulkContainer.classList.add('hidden');
+                qtyInput.classList.remove('hidden');
+                qtyFixed.classList.add('hidden');
+                btnSingle.classList.remove('hidden'); 
+                renderTables();
+            }
+        }
+
+        // Updated function to handle checkbox changes and updating display count
+        function updateBulkCount() {
+            const checkboxes = document.querySelectorAll('#bulkCheckboxes input[type="checkbox"]:checked');
+            const count = checkboxes.length;
+            const display = document.getElementById('bulkQtyDisplay');
+            if(count > 0) {
+                display.value = count + " (Judul Dipilih)";
+            } else {
+                display.value = "0";
+            }
+            renderTables();
+        }
+
+        function renderBulkCheckboxes() {
+            const tahun = document.getElementById('inputTahun').value;
+            const container = document.getElementById('bulkCheckboxes');
+            container.innerHTML = '';
+
+            if(!tahun) {
+                container.innerHTML = '<span class="text-red-500">Sila pilih tahun dahulu.</span>';
+                return;
+            }
+
+            const books = bookDatabase[tahun] || [];
+            books.forEach((book, index) => {
+                const div = document.createElement('div');
+                div.className = "flex items-start mb-2";
+                div.innerHTML = `
+                    <input type="checkbox" id="bulk_bk_${index}" value="${book.judul}" class="mt-1 mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateBulkCount()">
+                    <label for="bulk_bk_${index}" class="text-sm text-gray-700 leading-tight select-none cursor-pointer">${book.judul}</label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function loadAllData() {
+            const storedBooks = localStorage.getItem(DB_KEY);
+            if (storedBooks) {
+                let storedDB = JSON.parse(storedBooks);
+                for (const year in defaultBookData) {
+                    if (!storedDB[year] || storedDB[year].length === 0 || (storedDB[year].length === 1 && !storedDB[year][0].judul)) {
+                        storedDB[year] = defaultBookData[year];
+                    }
+                }
+                bookDatabase = storedDB;
+            } else {
+                bookDatabase = defaultBookData;
+            }
+            localStorage.setItem(DB_KEY, JSON.stringify(bookDatabase));
+
+            const storedTrans = localStorage.getItem('spbtTransactions');
+            if (storedTrans) transactions = JSON.parse(storedTrans);
+
+            const storedMeta = localStorage.getItem('spbtMetadata');
+            if (storedMeta) {
+                metadata = JSON.parse(storedMeta);
+                document.getElementById('inputTahun').value = metadata.tahun;
+                loadBookListForYear();
+                document.getElementById('inputJudul').value = metadata.judul;
+                fillBookDetails();
+                document.getElementById('inputKod').value = metadata.kod;
+                document.getElementById('input_oleh').value = metadata.oleh || '';
+            }
+            renderTables();
+        }
+
+        function saveMetadata() {
+            metadata.tahun = document.getElementById('inputTahun').value;
+            if (!document.getElementById('toggleBulk').checked) {
+                metadata.judul = document.getElementById('inputJudul').value;
+            }
+            metadata.penerbit = document.getElementById('inputPenerbit').value; 
+            metadata.harga = document.getElementById('inputHarga').value;
+            metadata.kod = document.getElementById('inputKod').value;
+            metadata.oleh = document.getElementById('input_oleh').value;
+            localStorage.setItem('spbtMetadata', JSON.stringify(metadata));
+            updateCetakanOleh();
+        }
+
+        function loadBookListForYear() {
+            const tahun = document.getElementById('inputTahun').value;
+            const judulSelect = document.getElementById('inputJudul');
+            
+            judulSelect.innerHTML = '<option value="">-- Pilih Buku --</option>';
+            document.getElementById('inputHarga').value = '';
+            document.getElementById('inputPenerbit').value = '';
+
+            if (!tahun) return;
+
+            const books = bookDatabase[tahun] || [];
+            books.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.judul;
+                opt.text = b.judul;
+                opt.setAttribute('data-harga', b.harga);
+                opt.setAttribute('data-penerbit', b.penerbit);
+                judulSelect.add(opt);
+            });
+            if(document.getElementById('toggleBulk').checked) renderBulkCheckboxes();
+        }
+
+        function fillBookDetails() {
+            const judulSelect = document.getElementById('inputJudul');
+            const selectedOpt = judulSelect.options[judulSelect.selectedIndex];
+            if (selectedOpt && selectedOpt.value) {
+                document.getElementById('inputHarga').value = selectedOpt.getAttribute('data-harga');
+                document.getElementById('inputPenerbit').value = selectedOpt.getAttribute('data-penerbit');
+            } else {
+                document.getElementById('inputHarga').value = '';
+                document.getElementById('inputPenerbit').value = '';
+            }
+            renderTables();
+        }
+
+        function openConfigModal() {
+            const tahun = document.getElementById('inputTahun').value;
+            if(!tahun) { alert("Sila pilih Tahun dahulu."); return; }
+            document.getElementById('modalTahunTitle').innerText = tahun;
+            const tbody = document.getElementById('configTableBody');
+            tbody.innerHTML = '';
+            const books = bookDatabase[tahun] || [];
+            if(books.length === 0) addConfigRowHTML('', '', '');
+            else books.forEach(b => addConfigRowHTML(b.judul, b.harga, b.penerbit));
+            document.getElementById('configModal').style.display = 'flex';
+        }
+
+        function closeConfigModal() { document.getElementById('configModal').style.display = 'none'; }
+        function addConfigRow() { addConfigRowHTML('', '', ''); }
+        function addConfigRowHTML(judul, harga, penerbit) {
+            const tbody = document.getElementById('configTableBody');
+            const row = document.createElement('tr');
+            row.className = "bg-white border-b hover:bg-gray-50";
+            row.innerHTML = `
+                <td class="p-2"><input type="text" class="w-full border p-1 rounded cfg-judul" value="${judul}" placeholder="Nama Buku"></td>
+                <td class="p-2"><input type="text" class="w-full border p-1 rounded cfg-harga" value="${harga}" placeholder="0.00"></td>
+                <td class="p-2"><input type="text" class="w-full border p-1 rounded cfg-penerbit" value="${penerbit}" placeholder="Penerbit"></td>
+                <td class="p-2 text-center"><button onclick="this.closest('tr').remove()" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        function saveConfigData() {
+            const tahun = document.getElementById('inputTahun').value;
+            const rows = document.querySelectorAll('#configTableBody tr');
+            const newBooks = [];
+            rows.forEach(row => {
+                const judul = row.querySelector('.cfg-judul').value.trim();
+                const harga = row.querySelector('.cfg-harga').value.trim();
+                const penerbit = row.querySelector('.cfg-penerbit').value.trim();
+                if(judul) newBooks.push({ judul, harga, penerbit });
+            });
+            bookDatabase[tahun] = newBooks;
+            localStorage.setItem(DB_KEY, JSON.stringify(bookDatabase));
+            loadBookListForYear();
+            closeConfigModal();
+            alert("Senarai buku berjaya disimpan!");
+        }
+
+        function saveBulkData() {
+            const tahun = document.getElementById('inputTahun').value;
+            if(!tahun) { alert("Sila pilih tahun."); return; }
+
+            const checkboxes = document.querySelectorAll('#bulkCheckboxes input[type="checkbox"]:checked');
+            if(checkboxes.length === 0) { alert("Sila tanda sekurang-kurangnya satu buku untuk disimpan."); return; }
+
+            const mode = document.querySelector('input[name="jenisTrans"]:checked').value;
+            const tarikh = document.getElementById('tTarikh').value;
+            const rujukan = document.getElementById('tNoRujukan').value;
+            const notaSerahan = document.getElementById('tNotaSerahan').value;
+            const currentOleh = document.getElementById('input_oleh').value;
+            
+            let catatanVal = "";
+            if (mode === 'terima') {
+                catatanVal = document.getElementById('tCatatan').value;
+            } else {
+                catatanVal = document.getElementById('tNamaPenerima').value.toUpperCase();
+                if(!catatanVal) { alert("Sila masukkan Nama Penerima."); return; }
+            }
+
+            let sourceVal = '', destVal = '';
+            if (mode === 'terima') sourceVal = getComplexInputValue('source');
+            else destVal = getComplexInputValue('dest');
+
+            checkboxes.forEach(chk => {
+                let transData = {
+                    id: Date.now() + Math.random(),
+                    folderTahun: tahun,
+                    folderJudul: chk.value,
+                    date: tarikh,
+                    type: mode, 
+                    qty: 1, // Fixed qty per book title
+                    ref: rujukan,
+                    nota: notaSerahan,
+                    staff: catatanVal, 
+                    oleh: currentOleh, 
+                    source: sourceVal,
+                    destination: destVal
+                };
+                transactions.push(transData);
+            });
+
+            transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+            localStorage.setItem('spbtTransactions', JSON.stringify(transactions));
+            
+            alert(`${checkboxes.length} rekod pukal telah DISIMPAN ke dalam arkib!`);
+            renderTables();
+        }
+
+        function addTransaction(e) {
+            e.preventDefault();
+            const tahun = document.getElementById('inputTahun').value;
+            const judul = document.getElementById('inputJudul').value;
+            if(!tahun || !judul) { alert("Sila pilih Tahun dan Judul Buku."); return; }
+
+            const mode = document.querySelector('input[name="jenisTrans"]:checked').value;
+            const tarikh = document.getElementById('tTarikh').value;
+            const qty = parseInt(document.getElementById('tBilangan').value);
+            const rujukan = document.getElementById('tNoRujukan').value;
+            const notaSerahan = document.getElementById('tNotaSerahan').value;
+            const currentOleh = document.getElementById('input_oleh').value;
+            
+            let catatanVal = "";
+            if (mode === 'terima') {
+                catatanVal = document.getElementById('tCatatan').value;
+            } else {
+                catatanVal = document.getElementById('tNamaPenerima').value.toUpperCase();
+                if(!catatanVal) { alert("Sila masukkan Nama Penerima."); return; }
+            }
+
+            let sourceVal = '', destVal = '';
+            if (mode === 'terima') sourceVal = getComplexInputValue('source');
+            else destVal = getComplexInputValue('dest');
+
+            let transData = {
+                id: Date.now(),
+                folderTahun: tahun,
+                folderJudul: judul,
+                date: tarikh,
+                type: mode, 
+                qty: qty,
+                ref: rujukan,
+                nota: notaSerahan,
+                staff: catatanVal, 
+                oleh: currentOleh, 
+                source: sourceVal,
+                destination: destVal
+            };
+            transactions.push(transData);
+            transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+            localStorage.setItem('spbtTransactions', JSON.stringify(transactions));
+            renderTables();
+            document.getElementById('tBilangan').value = '';
+            alert('Rekod ditambah ke arkib!');
+        }
+
+        window.deleteTransaction = function(id) {
+            if(confirm("Padam rekod ini?")) {
+                transactions = transactions.filter(t => t.id !== id);
+                localStorage.setItem('spbtTransactions', JSON.stringify(transactions));
+                renderTables();
+            }
+        }
+
+        function updateCetakanOleh() {
+            var inputText = document.getElementById("input_oleh").value.toUpperCase();
+            var displays = document.querySelectorAll(".cetak_oleh_nama_display");
+            displays.forEach(d => d.innerText = inputText);
+        }
+
+        function renderTables() {
+            const currentTahun = document.getElementById('inputTahun').value;
+            
+            let selectedTitles = [];
+            const isBulk = document.getElementById('toggleBulk').checked;
+
+            if (isBulk) {
+                const checkboxes = document.querySelectorAll('#bulkCheckboxes input[type="checkbox"]:checked');
+                checkboxes.forEach(chk => selectedTitles.push(chk.value));
+            } else {
+                const val = document.getElementById('inputJudul').value;
+                if(val) selectedTitles.push(val);
+            }
+            
+            const screenTbody = document.getElementById('screenTableBody');
+            const printWrapper = document.getElementById('printAreaWrapper');
+            const emptyState = document.getElementById('emptyState');
+            const folderLabel = document.getElementById('folderLabel');
+
+            screenTbody.innerHTML = ''; 
+            printWrapper.innerHTML = '';
+
+            if (currentTahun && selectedTitles.length > 0) {
+                if(selectedTitles.length > 1) {
+                    folderLabel.innerText = `${currentTahun} - [ ${selectedTitles.length} BUKU DIPILIH UNTUK CETAKAN KELOMPOK ]`;
+                } else {
+                    folderLabel.innerText = `${currentTahun} - ${selectedTitles[0]}`;
+                }
+                folderLabel.className = "text-blue-800 font-bold";
+            } else {
+                folderLabel.innerText = "Sila Pilih Tahun & Judul / Tanda Kotak";
+                folderLabel.className = "text-gray-500 italic";
+                emptyState.classList.remove('hidden');
+                return; 
+            }
+
+            let hasData = false;
+
+            selectedTitles.forEach(title => {
+                const folderItems = transactions.filter(t => t.folderTahun === currentTahun && t.folderJudul === title);
+                
+                let price = "0.00";
+                let publisher = "";
+                const yearBooks = bookDatabase[currentTahun] || [];
+                const bookMeta = yearBooks.find(b => b.judul === title);
+                if(bookMeta) {
+                    price = bookMeta.harga;
+                    publisher = bookMeta.penerbit;
+                }
+
+                let code = document.getElementById('inputKod').value;
+                let userOleh = document.getElementById('input_oleh').value.toUpperCase();
+
+                if (selectedTitles.length > 0) { 
+                     hasData = true;
+
+                    if(selectedTitles.length > 1) {
+                         const sepRow = document.createElement('tr');
+                         sepRow.className = "bg-gray-100 font-bold";
+                         sepRow.innerHTML = `<td colspan="7" class="px-4 py-2 text-center border-t border-b text-blue-800 uppercase tracking-widest"><i class="fas fa-book mr-2"></i>${title}</td>`;
+                         screenTbody.appendChild(sepRow);
+                    }
+
+                    let runningBalance = 0;
+                    let printRowsHTML = '';
+
+                    folderItems.forEach(t => {
+                        let inQty = t.type === 'terima' ? parseInt(t.qty) : 0;
+                        let outQty = t.type === 'keluar' ? parseInt(t.qty) : 0;
+                        runningBalance = runningBalance + inQty - outQty;
+
+                        const screenRow = document.createElement('tr');
+                        screenRow.innerHTML = `
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${formatDate(t.date)}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${t.type === 'terima' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${t.type === 'terima' ? 'TERIMA' : 'KELUAR'}</span></td>
+                            <td class="px-4 py-3 text-sm text-gray-500"><div class="font-bold">${t.ref || '-'}</div><div class="text-xs text-gray-400">${t.nota ? 'Nota: '+t.nota : ''}</div><div class="text-xs">${t.type === 'terima' ? t.source : 'Ke: ' + t.destination}</div></td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-green-600">${inQty > 0 ? '+'+inQty : '-'}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-red-600">${outQty > 0 ? '-'+outQty : '-'}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold bg-yellow-50">${runningBalance}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-center text-sm font-medium"><button onclick="window.deleteTransaction(${t.id})" class="text-red-600 hover:text-red-900 ml-2 bg-red-50 p-2 rounded border border-red-200"><i class="fas fa-trash"></i></button></td>
+                        `;
+                        screenTbody.appendChild(screenRow);
+
+                        let html = '<tr>';
+                        if (t.type === 'terima') {
+                            html += `<td class="col-date">${formatDate(t.date)}</td><td class="col-nofail">${t.ref}</td><td class="col-nota">${t.nota || ''}</td><td class="col-bil">${t.qty}</td><td class="col-daripada">${t.source}</td><td class="col-oleh">${t.oleh || ''}</td><td class="col-date"></td><td class="col-kepada"></td><td class="col-rujkeluar"></td><td class="col-bil"></td>`;
+                        } else {
+                            html += `<td class="col-date"></td><td class="col-nofail"></td><td class="col-nota"></td><td class="col-bil"></td><td class="col-daripada"></td><td class="col-oleh"></td><td class="col-date">${formatDate(t.date)}</td><td class="col-kepada">${t.destination}</td><td class="col-rujkeluar">${t.ref}</td><td class="col-bil">${t.qty}</td>`;
+                        }
+                        html += `<td class="col-date">${formatDate(t.date)}</td><td class="col-baki">${runningBalance}</td><td class="col-catatan">${t.staff || ''}</td></tr>`;
+                        printRowsHTML += html;
+                    });
+
+                    const yearName = document.getElementById('inputTahun').options[document.getElementById('inputTahun').selectedIndex].text;
+                    const container = document.createElement('div');
+                    container.className = "print-container"; 
+                    container.innerHTML = `
+                        <div class="print-title">PENGISIAN BUKU STOK SPBT</div>
+                        <div class="header-info-grid">
+                            <div>TAHUN/TINGKATAN: <span class="font-normal pl-2">${yearName}</span></div>
+                            <div>JUDUL BUKU: <span class="font-normal pl-2">${title}</span></div>
+                            <div>PENERBIT: <span class="font-normal pl-2">${publisher}</span></div>
+                            <div style="display: flex; gap: 20px;">
+                                <span>KOD BUKU: <span class="font-normal pl-2">${code}</span></span>
+                                <span>HARGA: RM <span class="font-normal pl-2">${price}</span></span>
+                            </div>
+                        </div>
+
+                        <table class="print-table">
+                            <thead>
+                                <tr>
+                                    <th colspan="6" class="uppercase">PENERIMAAN</th>
+                                    <th colspan="4" class="uppercase">KELUARAN</th>
+                                    <th colspan="2" class="uppercase">BAKI</th>
+                                    <th rowspan="3" class="col-catatan uppercase">CATATAN</th>
+                                </tr>
+                                <tr>
+                                    <th rowspan="2" class="col-date">Tarikh</th>
+                                    <th colspan="2">Rujukan</th>
+                                    <th rowspan="2" class="col-bil">Bilangan<br>Naskah</th>
+                                    <th rowspan="2" class="col-daripada">Daripada</th>
+                                    <th rowspan="2" class="col-oleh">Oleh<br><span style="font-size: 8pt; font-weight: normal;">(Nama & Jawatan)</span></th>
+                                    
+                                    <th rowspan="2" class="col-date">Tarikh</th>
+                                    <th rowspan="2" class="col-kepada">Kepada/<br>Tahun/<br>Tingkatan</th>
+                                    <th rowspan="2" class="col-rujkeluar">No.<br>Rujukan</th>
+                                    <th rowspan="2" class="col-bil">Bilangan<br>Naskah</th>
+
+                                    <th rowspan="2" class="col-date">Tarikh</th>
+                                    <th rowspan="2" class="col-bil">Jumlah<br>Naskah</th>
+                                </tr>
+                                <tr>
+                                    <th class="col-nofail">No.Fail</th>
+                                    <th class="col-nota">Nota Serahan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${printRowsHTML}
+                            </tbody>
+                        </table>
+                        
+                        <div class="signature-area">
+                            <div>
+                                <p class="mb-10">Disediakan Oleh:</p>
+                                <div class="signature-line"></div>
+                                <p class="mt-1"><b class="cetak_oleh_nama_display">${userOleh}</b></p>
+                                <p class="text-xs">(Nama & Jawatan)</p>
+                            </div>
+                            <div>
+                                <p class="mb-10">Disahkan Oleh:</p>
+                                <div class="signature-line"></div>
+                                <p class="mt-1">(Pengetua/Guru Besar)</p>
+                            </div>
+                        </div>
+                    `;
+                    printWrapper.appendChild(container);
+                }
+            });
+
+            if (!hasData) emptyState.classList.remove('hidden');
+            else emptyState.classList.add('hidden');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+            return new Date(dateStr).toLocaleDateString('en-GB', options);
+        }
+
+        function clearData() {
+            if(confirm("RESET SISTEM: Semua data transaksi dan senarai buku akan dipadam. Teruskan?")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function cetakLaporan() { window.print(); }
+
+        function toggleFormMode() {
+            const mode = document.querySelector('input[name="jenisTrans"]:checked').value;
+            if (mode === 'terima') {
+                document.getElementById('fieldPunca').classList.remove('hidden');
+                document.getElementById('fieldPenerima').classList.add('hidden');
+                document.getElementById('divNotaSerahan').classList.remove('hidden');
+                document.getElementById('lblNoRujukan').innerText = "No. Fail";
+                document.getElementById('tNoRujukan').placeholder = "Contoh: JPN/SPBT/2023/01";
+                document.getElementById('divCatatanDropdown').classList.remove('hidden');
+                document.getElementById('divNamaPenerima').classList.add('hidden');
+            } else {
+                document.getElementById('fieldPunca').classList.add('hidden');
+                document.getElementById('fieldPenerima').classList.remove('hidden');
+                document.getElementById('divNotaSerahan').classList.add('hidden');
+                document.getElementById('lblNoRujukan').innerText = "No. Rujukan";
+                document.getElementById('tNoRujukan').placeholder = "Rujukan surat/dokumen";
+                document.getElementById('divCatatanDropdown').classList.add('hidden');
+                document.getElementById('divNamaPenerima').classList.remove('hidden');
+            }
+        }
+
+        function handleSrcChange() {
+            const main = document.getElementById('tDaripadaMain').value;
+            document.getElementById('tDaripadaKelas').classList.toggle('hidden', main !== 'SPBTG KELAS');
+            document.getElementById('tDaripadaLain').classList.toggle('hidden', main !== 'Lain-Lain');
+        }
+
+        function handleDestChange() {
+            const main = document.getElementById('tKepadaMain').value;
+            document.getElementById('tKepadaKelas').classList.toggle('hidden', main !== 'SPBTG KELAS');
+            document.getElementById('tKepadaLain').classList.toggle('hidden', main !== 'Lain-Lain');
+        }
+
+        function getComplexInputValue(type) {
+            let main, subClass, customInput;
+            if (type === 'source') {
+                main = document.getElementById('tDaripadaMain').value;
+                subClass = document.getElementById('tDaripadaKelas');
+                customInput = document.getElementById('tDaripadaLain');
+            } else {
+                main = document.getElementById('tKepadaMain').value;
+                subClass = document.getElementById('tKepadaKelas');
+                customInput = document.getElementById('tKepadaLain');
+            }
+            if (main === 'SPBTG KELAS') return subClass.value || main; 
+            else if (main === 'Lain-Lain') return customInput.value || '';
+            else return main;
+        }
+    </script>
+</body>
+</html>
